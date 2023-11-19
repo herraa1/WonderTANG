@@ -3539,7 +3539,7 @@
   (gr_text "32" (at 104.14 133.985) (layer "F.SilkS") (tstamp ac9568f8-33f3-47b5-aa57-23c82edcfb19)
     (effects (font (size 1 1) (thickness 0.15)))
   )
-  (gr_text "2023 V1.01b\nLUIS ANTONIOSI" (at 61.722 120.142 90) (layer "F.SilkS") (tstamp b7d4d3d1-0c71-42fb-afbb-1043b5969346)
+  (gr_text "2023 V1.01b.F1\nLUIS ANTONIOSI (herraa1 fork)" (at 61.722 120.142 90) (layer "F.SilkS") (tstamp b7d4d3d1-0c71-42fb-afbb-1043b5969346)
     (effects (font (size 1.5 1.5) (thickness 0.3) bold) (justify left bottom))
   )
   (gr_text "SW" (at 88.9 132.715 90) (layer "F.SilkS") (tstamp ba5d1d3b-b973-4b4e-87dd-3e29d9b717eb)
