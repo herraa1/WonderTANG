@@ -1,4 +1,4 @@
-`define SMS
+//`define SMS
 
 module top(
     input   clk,
@@ -18,8 +18,10 @@ module top(
     output     [2:0]  tmds_data_n,
 `endif
 
+`ifdef AUDIO
     output audio,
     output sound,
+` endif
     input jp_n,
 
     input clock,
@@ -40,20 +42,18 @@ module top(
     output [2:0] msel_n,
 
 //    // flash
+`define FLASH
+`ifdef FLASH
     output mspi_cs,
     output mspi_sclk,
     inout mspi_miso,
     inout mspi_mosi,
+`endif
  
-    // MicroSD
-    output sd_sclk,
-    inout sd_cmd,      // MOSI
-    inout  sd_dat0,     // MISO
-    output sd_dat1,     // 1
-    output sd_dat2,     // 1
-    output sd_dat3,     // 1
    
     // SDRAM
+`define SDRAM
+`ifdef SDRAM
     output O_sdram_clk,
     output O_sdram_cke,
     output O_sdram_cs_n,            // chip select
@@ -63,7 +63,17 @@ module top(
     inout [31:0] IO_sdram_dq,       // 32 bit bidirectional data bus
     output [10:0] O_sdram_addr,     // 11 bit multiplexed address bus
     output [1:0] O_sdram_ba,        // two banks
-    output [3:0] O_sdram_dqm       // 32/4
+    output [3:0] O_sdram_dqm,       // 32/4
+`endif
+
+    // MicroSD
+    output sd_sclk,
+    inout sd_cmd,      // MOSI
+    inout  sd_dat0,     // MISO
+    output sd_dat1,     // 1
+    output sd_dat2,     // 1
+    output sd_dat3     // 1
+
 );
 
 wire reset_ram_n;
@@ -164,6 +174,7 @@ wire reset_rom_n;
 //        clk54 <= ~clk54;
 //    end
 
+`ifdef CLK54
     CLKDIV #(
         .DIV_MODE(2)
     )(
@@ -175,9 +186,9 @@ wire reset_rom_n;
     .O(clk54_w),
     .I(clk54)
     );
+`endif
 
 /// FLASH ROM LOADER - BIOS
-
 
 reg ff_rom_wr = 0;
 reg [7:0] ff_rom_dout;
@@ -832,12 +843,13 @@ expslot(
 );
 
 ///////////////////////// SUB SLOTS //////////////////////////////
-localparam MM_SSLT = 3;
-localparam MR_SSLT = 2;
-localparam FM_SSLT = 1;
-localparam BIOS_SSLT = 0;
+//localparam MM_SSLT = 2'b11;
+//localparam MR_SSLT = 2'b10;
+//localparam FM_SSLT = 2'b01;
+localparam BIOS_SSLT = 2'b00;
 
-
+`define MEGAROM
+`ifdef MEGAROM
 wire [22:0] bios_addr_w;
 megaromBIOS(
     .clk(clk108_w),
@@ -854,6 +866,7 @@ megaromBIOS(
     .mem_addr(bios_addr_w),
     .cart_ena(cart_ena_w[BIOS_SSLT])
 );
+`endif
 
 ////
 localparam int SDC_SDATA		=  16'h7C00;		 	// rw: 7C00h-7Dff - sector transfer area
@@ -1042,6 +1055,7 @@ end
 
 //////
 
+`ifdef MEGARAM
 wire [7:0] mmapper_cd_w;
 wire mmapper_busreq_w;
 wire [22:0] mmapper_addr_w;
@@ -1259,6 +1273,7 @@ rom #(
     .q(fmrom_cd_w),
     .enable(fmrom_busreq_w)
 );
+` endif
 
 //// SDRAM
 wire ram_re_w;
@@ -1281,19 +1296,19 @@ end
 
 assign ram_addr_w = (~flash_idle_w) ? rom_addr_w :
                     (ram_enabled_w && slotsel_w[BIOS_SSLT] && cart_ena_w[BIOS_SSLT]) ? bios_addr_w :
-                    (ram_enabled_w && slotsel_w[MM_SSLT] && cart_ena_w[MM_SSLT]) ? mmapper_addr_w :
-                    (ram_enabled_w && slotsel_w[MR_SSLT] && cart_ena_w[MR_SSLT]) ? megaram_addr_w :
+                    //(ram_enabled_w && slotsel_w[MM_SSLT] && cart_ena_w[MM_SSLT]) ? mmapper_addr_w :
+                    //(ram_enabled_w && slotsel_w[MR_SSLT] && cart_ena_w[MR_SSLT]) ? megaram_addr_w :
                     23'h7fffff; 
 
 assign ram_re_w = (~flash_idle_w) ? 0 : 
                   (ram_enabled_w && ~ff_mem_ack && slotsel_w[BIOS_SSLT] && cart_ena_w[BIOS_SSLT]) ? ~rd_n_w :
-                  (ram_enabled_w && ~ff_mem_ack && slotsel_w[MM_SSLT] && cart_ena_w[MM_SSLT]) ? ~rd_n_w :
-                  (ram_enabled_w && ~ff_mem_ack && slotsel_w[MR_SSLT] && cart_ena_w[MR_SSLT]) ? ~rd_n_w :
+                  //(ram_enabled_w && ~ff_mem_ack && slotsel_w[MM_SSLT] && cart_ena_w[MM_SSLT]) ? ~rd_n_w :
+                  //(ram_enabled_w && ~ff_mem_ack && slotsel_w[MR_SSLT] && cart_ena_w[MR_SSLT]) ? ~rd_n_w :
                   0; 
 
 assign ram_we_w = (~flash_idle_w) ? rom_wr_w : 
-                  (ram_enabled_w && ~ff_mem_ack && slotsel_w[MM_SSLT] && cart_ena_w[MM_SSLT]) ? ~wr_n_w :
-                  (ram_enabled_w && ~ff_mem_ack && slotsel_w[MR_SSLT] && cart_ena_w[MR_SSLT] && megaram_ena_w) ? ~wr_n_w :
+                  //(ram_enabled_w && ~ff_mem_ack && slotsel_w[MM_SSLT] && cart_ena_w[MM_SSLT]) ? ~wr_n_w :
+                  //(ram_enabled_w && ~ff_mem_ack && slotsel_w[MR_SSLT] && cart_ena_w[MR_SSLT] && megaram_ena_w) ? ~wr_n_w :
                   0; 
 
 assign ram_dout_w = (ram_addr_w[0] == 1'b0) ? ram_dout16_w[7:0] : ram_dout16_w[15:8];
@@ -1301,19 +1316,19 @@ assign ram_dout_w = (ram_addr_w[0] == 1'b0) ? ram_dout16_w[7:0] : ram_dout16_w[1
 reg [7:0] ff_cdout;
 always @(posedge clk108_w) begin
     //ff_cdout = 'z;
-    if (slotsel_w[BIOS_SSLT] && cart_ena_w[BIOS_SSLT]||
+    if (slotsel_w[BIOS_SSLT] && cart_ena_w[BIOS_SSLT] /*||
         slotsel_w[MM_SSLT] && cart_ena_w[MM_SSLT] ||
-        slotsel_w[MR_SSLT] && cart_ena_w[MR_SSLT]) ff_cdout <= ram_dout_w;
+        slotsel_w[MR_SSLT] && cart_ena_w[MR_SSLT]*/ ) ff_cdout <= ram_dout_w;
     if (sram_busreq_w) ff_cdout <= sram_cd_w;
     if (sd_busreq_w) ff_cdout <= sd_cd_w;
-    if (scc_busreq_w) ff_cdout <= scc_cd_w;
-    if (fmrom_busreq_w) ff_cdout <= fmrom_cd_w;
+    //if (scc_busreq_w) ff_cdout <= scc_cd_w;
+    //if (fmrom_busreq_w) ff_cdout <= fmrom_cd_w;
 
 `ifdef SMS
     if (~vdp_rd_n) ff_cdout <= vdp_cdout;
 `endif
 
-    if (mmapper_busreq_w) ff_cdout <= mmapper_cd_w;
+    //if (mmapper_busreq_w) ff_cdout <= mmapper_cd_w;
     if (expslot_busreq_w) ff_cdout <= expslot_cd_w;
 end
 
@@ -1324,8 +1339,8 @@ wire busdir_cs_w;
 wire vdp_rd_n = 1'b1;
 `endif
 
-assign busdir_cs_w = (mmapper_busreq_w || ~vdp_rd_n) ? 1 : 0;
-assign iord_w = (mmapper_busreq_w || ~vdp_rd_n) ? 1 : 0;
+assign busdir_cs_w = (/*mmapper_busreq_w || */ ~vdp_rd_n) ? 1 : 0;
+assign iord_w = (/*mmapper_busreq_w ||*/ ~vdp_rd_n) ? 1 : 0;
 assign busdir_n = ~iord_w; // io port without sltsl
 
 assign datadir = ((~sltsl_n_w || busdir_cs_w) && ~rd_n_w) ? 0 : 1;
