@@ -1,4 +1,39 @@
 `define SMS
+//`define MEGARAMSCC
+`define MEGAROM
+//`define MMAPPER
+//`define FMROM
+`define PSG
+//`define OPLL
+
+`ifdef SMS
+`define OPLL
+`define MEGARAMSCC
+`define PSG
+`define JT89
+`endif //SMS
+
+`ifdef MEGARAMSCC
+//`define OPLL
+//`define PSG
+`endif //MEGARAMSCC
+
+`ifdef MEGARAMSCC
+`define AUDIO
+`endif //MEGARAMSCC
+
+`ifdef PSG
+`define AUDIO
+`endif //PSG
+
+`ifdef OPLL
+`define AUDIO
+`endif //OPLL
+
+`ifdef AUDIO
+`define CLK54
+`endif //AUDIO
+
 
 module top(
     input   clk,
@@ -16,10 +51,12 @@ module top(
     output            tmds_clk_n,
     output     [2:0]  tmds_data_p,
     output     [2:0]  tmds_data_n,
-`endif
+`endif //SMS
 
+`ifdef AUDIO
     output audio,
     output sound,
+`endif //AUDIO
     input jp_n,
 
     input clock,
@@ -45,13 +82,6 @@ module top(
     inout mspi_miso,
     inout mspi_mosi,
  
-    // MicroSD
-    output sd_sclk,
-    inout sd_cmd,      // MOSI
-    inout  sd_dat0,     // MISO
-    output sd_dat1,     // 1
-    output sd_dat2,     // 1
-    output sd_dat3,     // 1
    
     // SDRAM
     output O_sdram_clk,
@@ -63,7 +93,16 @@ module top(
     inout [31:0] IO_sdram_dq,       // 32 bit bidirectional data bus
     output [10:0] O_sdram_addr,     // 11 bit multiplexed address bus
     output [1:0] O_sdram_ba,        // two banks
-    output [3:0] O_sdram_dqm       // 32/4
+    output [3:0] O_sdram_dqm,       // 32/4
+
+    // MicroSD
+    output sd_sclk,
+    inout sd_cmd,      // MOSI
+    inout  sd_dat0,     // MISO
+    output sd_dat1,     // 1
+    output sd_dat2,     // 1
+    output sd_dat3     // 1
+
 );
 
 wire reset_ram_n;
@@ -139,7 +178,7 @@ wire reset_rom_n;
 `else
 
     assign rst_w = ~clk108_lock_w;
-`endif
+`endif //SMS
 
     clkp_108 (
         .clkout(clk108), //output clkout
@@ -164,6 +203,7 @@ wire reset_rom_n;
 //        clk54 <= ~clk54;
 //    end
 
+`ifdef CLK54
     CLKDIV #(
         .DIV_MODE(2)
     )(
@@ -175,9 +215,9 @@ wire reset_rom_n;
     .O(clk54_w),
     .I(clk54)
     );
+`endif //CLK54
 
 /// FLASH ROM LOADER - BIOS
-
 
 reg ff_rom_wr = 0;
 reg [7:0] ff_rom_dout;
@@ -512,7 +552,6 @@ assign reset_rom_n = ram_enabled_w && ~ram_fail_w ;
 
 
 ////// SMS
-
 `ifdef SMS
 
 //reg ff_sms_init = 0;
@@ -807,7 +846,7 @@ dpram#(
         .OB({tmds_clk_n, tmds_data_n})
     );
 
-`endif
+`endif //SMS
 /////////////////////////////////////////////////////////////////
 
 
@@ -832,13 +871,22 @@ expslot(
 );
 
 ///////////////////////// SUB SLOTS //////////////////////////////
-localparam MM_SSLT = 3;
-localparam MR_SSLT = 2;
-localparam FM_SSLT = 1;
-localparam BIOS_SSLT = 0;
+`ifdef MMAPPER
+localparam MM_SSLT = 2'b11;
+`endif //MMAPPER
 
+`ifdef MEGARAMSCC
+localparam MR_SSLT = 2'b10;
+`endif //MEGARAMSCC
+
+`ifdef FMROM
+localparam FM_SSLT = 2'b01;
+`endif //FMROM
+
+localparam BIOS_SSLT = 2'b00;
 
 wire [22:0] bios_addr_w;
+`ifdef MEGAROM
 megaromBIOS(
     .clk(clk108_w),
     .reset_n(ram_enabled_w),
@@ -854,6 +902,7 @@ megaromBIOS(
     .mem_addr(bios_addr_w),
     .cart_ena(cart_ena_w[BIOS_SSLT])
 );
+`endif //MEGAROM
 
 ////
 localparam int SDC_SDATA		=  16'h7C00;		 	// rw: 7C00h-7Dff - sector transfer area
@@ -1042,6 +1091,7 @@ end
 
 //////
 
+`ifdef MMAPPER
 wire [7:0] mmapper_cd_w;
 wire mmapper_busreq_w;
 wire [22:0] mmapper_addr_w;
@@ -1062,13 +1112,14 @@ mmapper(
     .mem_addr(mmapper_addr_w),
     .cart_ena(cart_ena_w[MM_SSLT])
 );
+`endif //MMAPPER
 
+`ifdef MEGARAMSCC
 wire megaram_ena_w;
 wire [22:0] megaram_addr_w;
 wire scc_busreq_w;
 wire [7:0] scc_cd_w;
 wire [14:0] scc_wave_w;
-
 
 wire megaram_cs_w;
 assign megaram_cs_w = (ram_enabled_w && ~iorq_n_w && m1_n_w && rd_n_w && ~wr_n_w && addr_w[7:0] == 8'h8F) ? 1 : 0;
@@ -1132,6 +1183,11 @@ megaramSCC(
     .scc_enable(scc_enable_w),
     .megaram_type(megaram_type_w)
 );
+
+reg [15:0] scc_mix;
+`endif //MEGARAMSCC
+
+`ifdef PSG
 //////////////// AUDIO
 //wire [7:0] psg_cd_w;
 wire [7:0] psg_wave_w;
@@ -1172,6 +1228,10 @@ YM2149(
   //debug()
   );
 
+reg [15:0] psg_mix;
+`endif //PSG
+
+`ifdef OPLL
 wire opll_req_w;
 assign opll_req_w = (ram_enabled_w && ~iorq_n_w && m1_n_w && ~wr_n_w && addr_w[7:1] == 7'b0111110) ? 1 : 0;
 
@@ -1190,34 +1250,71 @@ opll(
 ); 
 
 reg [15:0] opll_mix;
-reg [15:0] scc_mix;
-reg [15:0] psg_mix;
-reg [15:0] jt89_mix;
+`endif //OPLL
 
+`ifdef SMS
+reg [15:0] jt89_mix;
+`endif //SMS
+
+`ifdef AUDIO
 reg [15:0] audio_sample;
 reg [15:0] sound_sample;
 reg [15:0] audio_hdmi;
 
-
 always@(posedge clk54_w) begin
 
+`ifdef OPLL
        opll_mix <=  { opll_mixout[13:0], 2'b0 } + 16'b1000000000000000;
+`endif //OPLL
+
+`ifdef MEGARAMSCC
        scc_mix <=   { scc_wave_w[14], scc_wave_w[14], scc_wave_w[14], scc_wave_w[14:2] } + 16'b0100000000000000;
+`endif //MEGARAMSCC
+
+`ifdef PSG
        psg_mix <=   { 4'b0, psg_wave_w[7:0], 4'b0 };
+`endif //PSG
+
 `ifdef SMS
-       jt89_mix <=  { jt89_wave[10], jt89_wave[10], jt89_wave[10], jt89_wave[10], jt89_wave[10:0], 1'b0 } + 16'b0000010000000000; 
+       jt89_mix <=  { jt89_wave[10], jt89_wave[10], jt89_wave[10], jt89_wave[10], jt89_wave[10:0], 1'b0 } + 16'b0000010000000000;
        audio_sample <= opll_mix + scc_mix + jt89_mix;
        sound_sample <= opll_mix + scc_mix + psg_mix + jt89_mix;
-`else
+`else //SMS
+`ifdef OPLL
+`ifdef MEGARAMSCC
        audio_sample <= opll_mix + scc_mix;
+`ifdef PSG
        sound_sample <= opll_mix + scc_mix + psg_mix;
-`endif
+`else //!PSG
+       sound_sample <= opll_mix + scc_mix;
+`endif //PSG
+`else //!MEGARAMSCC
+       audio_sample <= opll_mix;
+`ifdef PSG
+       sound_sample <= opll_mix + psg_mix;
+`else //!PSG
+       sound_sample <= opll_mix;
+`endif //PSG
+`endif //MEGARAMSCC
+`else //!OPLL
+`ifdef MEGARAMSCC
+       audio_sample <= scc_mix;
+`ifdef PSG
+       sound_sample <= scc_mix + psg_mix;
+`else //!PSG
+       sound_sample <= scc_mix;
+`endif //PSG
+`else //!MEGARAMSCC
+       sound_sample <= psg_mix;
+`endif //MEGARAMSCC
+`endif //OPLL
+`endif //SMS
        audio_hdmi <= (~audio_sample) + 16'b1;
 end
 
 `ifdef SMS
 assign sample_w = audio_hdmi;
-`endif
+`endif //SMS
 
 
 wire sound_w;
@@ -1243,7 +1340,10 @@ esepwm#(
 
 assign sound = ff_wait ? 0 : sound_w; // JACK
 assign audio = ff_wait ? 0 : audio_w; // EDGE
+`endif //AUDIO
 
+
+`ifdef FMROM
 ///// FM ROM
 
 wire [7:0] fmrom_cd_w;
@@ -1259,6 +1359,7 @@ rom #(
     .q(fmrom_cd_w),
     .enable(fmrom_busreq_w)
 );
+`endif //FMROM
 
 //// SDRAM
 wire ram_re_w;
@@ -1281,19 +1382,31 @@ end
 
 assign ram_addr_w = (~flash_idle_w) ? rom_addr_w :
                     (ram_enabled_w && slotsel_w[BIOS_SSLT] && cart_ena_w[BIOS_SSLT]) ? bios_addr_w :
+`ifdef MMAPPER
                     (ram_enabled_w && slotsel_w[MM_SSLT] && cart_ena_w[MM_SSLT]) ? mmapper_addr_w :
+`endif //MMAPPER
+`ifdef MEGARAMSCC
                     (ram_enabled_w && slotsel_w[MR_SSLT] && cart_ena_w[MR_SSLT]) ? megaram_addr_w :
+`endif //MEGARAMSCC
                     23'h7fffff; 
 
 assign ram_re_w = (~flash_idle_w) ? 0 : 
                   (ram_enabled_w && ~ff_mem_ack && slotsel_w[BIOS_SSLT] && cart_ena_w[BIOS_SSLT]) ? ~rd_n_w :
+`ifdef MMAPPER
                   (ram_enabled_w && ~ff_mem_ack && slotsel_w[MM_SSLT] && cart_ena_w[MM_SSLT]) ? ~rd_n_w :
+`endif //MMAPPER
+`ifdef MEGARAMSCC
                   (ram_enabled_w && ~ff_mem_ack && slotsel_w[MR_SSLT] && cart_ena_w[MR_SSLT]) ? ~rd_n_w :
+`endif //MEGARAMSCC
                   0; 
 
 assign ram_we_w = (~flash_idle_w) ? rom_wr_w : 
+`ifdef MMAPPER
                   (ram_enabled_w && ~ff_mem_ack && slotsel_w[MM_SSLT] && cart_ena_w[MM_SSLT]) ? ~wr_n_w :
+`endif //MMAPPER
+`ifdef MEGARAMSCC
                   (ram_enabled_w && ~ff_mem_ack && slotsel_w[MR_SSLT] && cart_ena_w[MR_SSLT] && megaram_ena_w) ? ~wr_n_w :
+`endif //MEGARAMSCC
                   0; 
 
 assign ram_dout_w = (ram_addr_w[0] == 1'b0) ? ram_dout16_w[7:0] : ram_dout16_w[15:8];
@@ -1301,19 +1414,30 @@ assign ram_dout_w = (ram_addr_w[0] == 1'b0) ? ram_dout16_w[7:0] : ram_dout16_w[1
 reg [7:0] ff_cdout;
 always @(posedge clk108_w) begin
     //ff_cdout = 'z;
-    if (slotsel_w[BIOS_SSLT] && cart_ena_w[BIOS_SSLT]||
-        slotsel_w[MM_SSLT] && cart_ena_w[MM_SSLT] ||
-        slotsel_w[MR_SSLT] && cart_ena_w[MR_SSLT]) ff_cdout <= ram_dout_w;
+    if (slotsel_w[BIOS_SSLT] && cart_ena_w[BIOS_SSLT]
+`ifdef MMAPPER
+        || slotsel_w[MM_SSLT] && cart_ena_w[MM_SSLT]
+`endif //MMAPPER
+`ifdef MEGARAMSCC
+        || slotsel_w[MR_SSLT] && cart_ena_w[MR_SSLT]
+`endif //MEGARAMSCC
+        ) ff_cdout <= ram_dout_w;
     if (sram_busreq_w) ff_cdout <= sram_cd_w;
     if (sd_busreq_w) ff_cdout <= sd_cd_w;
+`ifdef MEGARAMSCC
     if (scc_busreq_w) ff_cdout <= scc_cd_w;
+`endif //MEGARAMSCC
+`ifdef FMROM
     if (fmrom_busreq_w) ff_cdout <= fmrom_cd_w;
+` endif //FMROM
 
 `ifdef SMS
     if (~vdp_rd_n) ff_cdout <= vdp_cdout;
-`endif
+`endif //SMS
 
+`ifdef MMAPPER
     if (mmapper_busreq_w) ff_cdout <= mmapper_cd_w;
+` endif //MMAPPER
     if (expslot_busreq_w) ff_cdout <= expslot_cd_w;
 end
 
@@ -1322,10 +1446,18 @@ wire busdir_cs_w;
 
 `ifndef SMS
 wire vdp_rd_n = 1'b1;
-`endif
+`endif //SMS
 
-assign busdir_cs_w = (mmapper_busreq_w || ~vdp_rd_n) ? 1 : 0;
-assign iord_w = (mmapper_busreq_w || ~vdp_rd_n) ? 1 : 0;
+assign busdir_cs_w = (
+`ifdef MMAPPER
+                      mmapper_busreq_w ||
+`endif //MMAPPER
+                      ~vdp_rd_n) ? 1 : 0;
+assign iord_w = (
+`ifdef MMAPPER
+                 mmapper_busreq_w ||
+`endif //MMAPPER
+                 ~vdp_rd_n) ? 1 : 0;
 assign busdir_n = ~iord_w; // io port without sltsl
 
 assign datadir = ((~sltsl_n_w || busdir_cs_w) && ~rd_n_w) ? 0 : 1;
@@ -1365,7 +1497,7 @@ memory_controller #(.FREQ(108_000_000) )
 assign int_n = ( ~vdp_irq_n) ? 1'b0 : 1'b1;
 `else
 assign int_n = 1'b1;
-`endif
+`endif //SMS
 
 assign wait_n = (ff_wait || ~reset_ram_n) ? 1'b1 : 1'b0; 
 assign led = sd_busy_w;
