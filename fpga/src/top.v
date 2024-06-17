@@ -1176,6 +1176,10 @@ YM2149(
 wire opll_req_w;
 assign opll_req_w = (ram_enabled_w && ~iorq_n_w && m1_n_w && ~wr_n_w && addr_w[7:1] == 7'b0111110) ? 1 : 0;
 
+
+//`define OPLL_OLD
+`ifdef OPLL_OLD
+
 wire [13:0] opll_mixout;
 
 opll(
@@ -1189,6 +1193,27 @@ opll(
     .ic_n(ram_enabled_w),
     .mixout(opll_mixout)
 ); 
+
+
+`else
+
+wire [15:0] opll_mixout;
+
+jt2413 msx_opll (
+    .rst(~ram_enabled_w),
+    .clk(clock_w),
+    .cen(1'b1),
+    .din(cdin_w),
+    .addr(addr_w[0]),
+    .cs_n(~opll_req_w),
+    .wr_n(wr_n_w),
+    //.dout
+    //.irq_en
+    .snd(opll_mixout)
+    //.sample
+);
+
+`endif
 
 reg [15:0] opll_mix;
 reg [15:0] scc_mix;
@@ -1205,7 +1230,12 @@ reg [15:0] audio_hdmi;
 
 always@(posedge clk54_w) begin
 
+`ifdef OPLL_OLD
        opll_mix <=  { opll_mixout[13], opll_mixout[13], opll_mixout[13:0] } + 16'b0010000000000000;
+`else
+       opll_mix <=  { opll_mixout[14], opll_mixout[14], opll_mixout[14:1] } + 16'b0010000000000000;
+       //opll_mix <= opll_mixout;
+`endif
        scc_mix <=   { scc_wave_w[14], scc_wave_w[14], scc_wave_w[14:1] } + 16'b0010000000000000;
        psg_mix <=   { 3'b0, psg_wave_w[7:0], 5'b0 };
 `ifdef SMS
