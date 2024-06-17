@@ -1468,9 +1468,9 @@ memory_controller #(.FREQ(108_000_000) )
 );
 
 `ifdef SMS
-assign int_n = ( ~vdp_irq_n) ? 1'b0 : 1'b1;
+assign int_n = ( ~vdp_irq_n) ? 1'b1 : 1'b0;
 `else
-assign int_n = 1'b1;
+assign int_n = 1'b0;
 `endif
 
 assign wait_n = (ff_wait || ~reset_ram_n) ? 1'b1 : 1'b0; 
